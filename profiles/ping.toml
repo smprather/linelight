@@ -1,0 +1,36 @@
+schema = 1
+id = "ping"
+name = "iputils ping"
+description = "Ordinary ping line output; hosts, sequence numbers, TTL, times, loss."
+
+[[rule]]
+regex = '^PING\b'
+style = "heading"
+
+[[rule]]
+regex = '\b(?P<ip>\d{1,3}(?:\.\d{1,3}){3})\b'
+groups = { ip = "identifier" }
+
+[[rule]]
+regex = 'icmp_seq=(?P<seq>\d+)'
+groups = { seq = "number" }
+
+[[rule]]
+regex = 'ttl=(?P<ttl>\d+)'
+groups = { ttl = "number" }
+
+[[rule]]
+regex = 'time=(?P<time>[\d.]+ ?ms)'
+groups = { time = "number" }
+
+[[rule]]
+regex = '(?P<bad>timeout|unreachable|100% packet loss|Destination Host Unreachable)'
+groups = { bad = "error" }
+
+[[rule]]
+regex = '\b(?P<count>\d+) packets transmitted\b'
+groups = { count = "number" }
+
+[[rule]]
+regex = 'rtt min/avg/max/mdev'
+style = "heading"

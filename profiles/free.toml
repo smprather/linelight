@@ -1,0 +1,16 @@
+schema = 1
+id = "free"
+name = "procps free"
+description = "Memory and swap tables; labels, headers, and numbers."
+
+[[rule]]
+regex = '^(?P<label>Mem|Swap|Total|Low|High):'
+groups = { label = "heading" }
+
+[[rule]]
+regex = '^(?P<label>total|used|free|shared|buff/cache|available)\b'
+groups = { label = "heading" }
+
+[[rule]]
+regex = '\b(?P<num>\d+(?:[.,]\d+)?[KMGTPE]?i?)\b'
+groups = { num = "number" }

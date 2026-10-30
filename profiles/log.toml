@@ -1,0 +1,44 @@
+schema = 1
+id = "log"
+name = "Generic logs"
+description = "Explicit log filtering; levels, IPs, paths, quoted strings, timestamps."
+
+[[rule]]
+regex = '\b(?P<level>ERROR|CRIT|FATAL|PANIC)\b'
+groups = { level = "error" }
+
+[[rule]]
+regex = '\b(?P<level>WARN|WARNING)\b'
+groups = { level = "warning" }
+
+[[rule]]
+regex = '\b(?P<level>INFO|NOTICE)\b'
+groups = { level = "success" }
+
+[[rule]]
+regex = '\b(?P<level>DEBUG|TRACE)\b'
+groups = { level = "muted" }
+
+[[rule]]
+regex = '\b(?P<num>\d+)\b'
+groups = { num = "number" }
+
+[[rule]]
+regex = '\b(?P<ip>\d{1,3}(?:\.\d{1,3}){3})\b'
+groups = { ip = "identifier" }
+
+[[rule]]
+regex = '(?P<path>(?:/|\./)[^\s:]+)'
+groups = { path = "path" }
+
+[[rule]]
+regex = '"(?P<quoted>[^"]*)"'
+groups = { quoted = "accent" }
+
+[[rule]]
+regex = '\[(?P<pid>\d+)\]'
+groups = { pid = "muted" }
+
+[[rule]]
+regex = '^(?P<ts>\S*(?:\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T\S+))'
+groups = { ts = "muted" }

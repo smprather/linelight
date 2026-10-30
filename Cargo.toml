@@ -1,0 +1,20 @@
+[package]
+name = "linelight"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+description = "Standalone, unprivileged output colorizer with embedded profiles"
+
+[dependencies]
+regex = "1.11"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

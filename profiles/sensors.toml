@@ -1,0 +1,20 @@
+schema = 1
+id = "sensors"
+name = "lm-sensors"
+description = "Sensor labels, temperatures, limits, and alarms."
+
+[[rule]]
+regex = '^(?P<label>[^:]+):'
+groups = { label = "heading" }
+
+[[rule]]
+regex = '(?P<temp>[+-]?\d+(?:\.\d+)?)\s*°C'
+groups = { temp = "number" }
+
+[[rule]]
+regex = '\b(?P<limit>high|crit|max|min)\b'
+groups = { limit = "muted" }
+
+[[rule]]
+regex = '(?P<alarm>ALARM)'
+groups = { alarm = "error" }

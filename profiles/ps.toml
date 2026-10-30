@@ -1,0 +1,24 @@
+schema = 1
+id = "ps"
+name = "procps ps"
+description = "Process tables; users, PIDs, percentages, kernel threads, paths."
+
+[[rule]]
+regex = '^(?P<user>\S+)\s+(?P<pid>\d+)\s'
+groups = { user = "identifier", pid = "number" }
+
+[[rule]]
+regex = '\[(?P<thread>[^\]]+)\]'
+groups = { thread = "muted" }
+
+[[rule]]
+regex = '(?P<path>/[^\s]+)'
+groups = { path = "path" }
+
+[[rule]]
+regex = '\b(?P<pct>\d+\.\d+)\b'
+groups = { pct = "number" }
+
+[[rule]]
+regex = '^(?P<header>USER|PID|%CPU|%MEM|VSZ|RSS|TTY|STAT|START|TIME|COMMAND)\b'
+groups = { header = "heading" }

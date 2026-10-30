@@ -1,0 +1,28 @@
+schema = 1
+id = "diff"
+name = "GNU diff"
+description = "Unified and normal diff output; additions, removals, hunks, headers."
+
+[[rule]]
+regex = '^(?P<added>\+)|^(?P<removed>-)'
+groups = { added = "success", removed = "error" }
+
+[[rule]]
+regex = '^(?P<hunk>@@)'
+groups = { hunk = "heading" }
+
+[[rule]]
+regex = '^(?P<git>diff --git)'
+groups = { git = "heading" }
+
+[[rule]]
+regex = '^(?P<meta>index\s)'
+groups = { meta = "muted" }
+
+[[rule]]
+regex = '^(?P<old>--- )'
+groups = { old = "muted" }
+
+[[rule]]
+regex = '^(?P<new>\+\+\+ )'
+groups = { new = "muted" }

@@ -1,0 +1,32 @@
+schema = 1
+id = "df"
+name = "GNU df"
+description = "Filesystem usage tables; headers, sizes, percentages, mountpoints."
+
+[[rule]]
+regex = '^(?P<fs>\S+)\s'
+groups = { fs = "identifier" }
+
+[[rule]]
+regex = '\b(?P<size>\d+(?:[.,]\d+)?[KMGTPE]?)\b'
+groups = { size = "number" }
+
+[[rule]]
+regex = '\b(?P<pct>\d+)%'
+groups = { pct = "number" }
+
+[[rule]]
+regex = '\b(?P<pct>[7-8]\d)%'
+groups = { pct = "warning" }
+
+[[rule]]
+regex = '\b(?P<pct>9\d|100)%'
+groups = { pct = "error" }
+
+[[rule]]
+regex = '(?P<mount>/\S*)\s*$'
+groups = { mount = "path" }
+
+[[rule]]
+regex = '^Filesystem\b'
+style = "heading"

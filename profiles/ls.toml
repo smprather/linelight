@@ -1,0 +1,20 @@
+schema = 1
+id = "ls"
+name = "GNU ls -l"
+description = "Long directory listings; permissions, owners, sizes, dates, names, links."
+
+[[rule]]
+regex = '^(?P<perm>[-dlbcps][-rwxsStT]{9})\s+\d+\s+(?P<owner>\S+)\s+(?P<group>\S+)\s+(?P<size>\d+)\s+(?P<date>[A-Z][a-z]{2}\s+\d+\s+[\d:]+)\s+(?P<name>.+)$'
+groups = { perm = "identifier", owner = "identifier", group = "identifier", size = "number", date = "muted", name = "path" }
+
+[[rule]]
+regex = '-> (?P<target>.+)$'
+groups = { target = "path" }
+
+[[rule]]
+regex = '^(?P<dir>d)'
+groups = { dir = "accent" }
+
+[[rule]]
+regex = '^(?P<link>l)'
+groups = { link = "identifier" }

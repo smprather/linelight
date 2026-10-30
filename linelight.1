@@ -1,0 +1,108 @@
+.TH LINELIGHT 1 "2026-10-30" "linelight 0.1" "User Commands"
+.SH NAME
+linelight \- add semantic colour to plain command output and logs
+.SH SYNOPSIS
+.B linelight filter
+.B \-\-profile
+.I ID
+.RB [ \-\-color
+.IR auto | always | never ]
+.RB [ \-\-max-record
+.IR N ]
+.RB [ \-\-profile-dir
+.IR DIR ]
+.RB [ \-\-palette
+.IR PATH ]
+.br
+.B linelight profiles
+.RB [ \-\-profile-dir
+.IR DIR ]
+.br
+.B linelight explain
+.B \-\-profile
+.I ID
+.RB [ \-\-profile-dir
+.IR DIR ]
+.RB [ \-\-palette
+.IR PATH ]
+.br
+.B linelight check
+.RI [ PATH ...]
+.RB [ \-\-profile-dir
+.IR DIR ]
+.RB [ \-\-palette
+.IR PATH ]
+.SH DESCRIPTION
+.B linelight
+is a standalone, unprivileged filter. It adds semantic SGR styles to plain
+UTF-8 records and preserves every other byte.
+.PP
+Profiles are explicit. The program does not wrap commands, rewrite argv,
+change PATH, export colour environment variables, select replacement
+utilities, or manage services.
+.SH COMMANDS
+.TP
+.B filter
+Read stdin and write styled stdout. The default colour mode is
+.BR auto :
+colour only when stdout is a terminal and neither
+.B NO_COLOR
+(non-empty) nor
+.B TERM=dumb
+disables it. Explicit
+.B always
+and
+.B never
+win.
+.TP
+.B profiles
+List effective profile IDs, names, and sources.
+.TP
+.B explain
+Show a profile's effective source, palette, rules, and styles.
+.TP
+.B check
+Validate explicit profile paths, or every effective profile when no paths
+are given.
+.SH OPTIONS
+.TP
+.BI \-\-profile\  ID
+Profile ID, or an explicit
+.I .toml
+file path.
+.TP
+.BI \-\-color\  MODE
+.BR auto ,
+.BR always ,
+or
+.BR never .
+.TP
+.BI \-\-max-record\  N
+Bypass records longer than
+.I N
+bytes until the next LF. Default 65536.
+.TP
+.BI \-\-profile-dir\  DIR
+Additional profile directory. Repeatable; earlier entries take precedence.
+.TP
+.BI \-\-palette\  PATH
+Palette TOML file.
+.SH PROFILE RESOLUTION
+Explicit file, then
+.I ${XDG_CONFIG_HOME:-$HOME/.config}/linelight/profiles
+by stable ID, then each
+.BR \-\-profile-dir ,
+then embedded defaults. An override replaces a profile as a whole. There is no
+system-wide or current-directory lookup.
+.SH BYTE POLICY
+Records containing ESC/ANSI, NUL, other control bytes, a lone carriage return,
+or invalid UTF-8 pass through unchanged. LF, CRLF, and a final line without a
+newline are preserved. Progress/control markers flush immediately. Removing
+only inserted SGR sequences yields the original bytes.
+.SH EXIT STATUS
+0 on success, 1 on profile/config/output errors, 2 on usage errors.
+.SH SEE ALSO
+.I DESIGN.md
+in the source distribution.
+.SH AUTHOR
+linelight contributors.

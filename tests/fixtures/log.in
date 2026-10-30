@@ -1,0 +1,2 @@
+2026-10-30T12:34:56Z level=ERROR msg="failed" host=192.168.1.1 path=/var/log/app.log pid=42
+2026-10-30T12:34:57Z level=WARN msg="slow" host=10.0.0.1

@@ -1,0 +1,20 @@
+schema = 1
+id = "ss"
+name = "iproute2 ss"
+description = "Socket statistics; states, addresses, and ports."
+
+[[rule]]
+regex = '\b(?P<state>ESTAB|LISTEN|TIME-WAIT|CLOSE-WAIT|SYN-SENT|SYN-RECV|FIN-WAIT-[12]|UNCONN)\b'
+groups = { state = "identifier" }
+
+[[rule]]
+regex = '\b(?P<ip>\d{1,3}(?:\.\d{1,3}){3})\b'
+groups = { ip = "identifier" }
+
+[[rule]]
+regex = ':(?P<port>\d+)\b'
+groups = { port = "number" }
+
+[[rule]]
+regex = '^(?P<header>State|Recv-Q|Send-Q|Local Address|Peer Address)\b'
+groups = { header = "heading" }

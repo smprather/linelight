@@ -1,0 +1,28 @@
+schema = 1
+id = "lsblk"
+name = "util-linux lsblk"
+description = "Block device trees; names, sizes, types, mountpoints."
+
+[[rule]]
+regex = '^(?P<name>\S+)'
+groups = { name = "identifier" }
+
+[[rule]]
+regex = '[├└│─]'
+style = "muted"
+
+[[rule]]
+regex = '\b(?P<size>\d+(?:[.,]\d+)?[KMGTPE]?i?B?)\b'
+groups = { size = "number" }
+
+[[rule]]
+regex = '(?P<mount>/\S*)$'
+groups = { mount = "path" }
+
+[[rule]]
+regex = '\b(?P<kind>disk|part|lvm|crypt|loop|rom)\b'
+groups = { kind = "identifier" }
+
+[[rule]]
+regex = '^NAME\b'
+style = "heading"
