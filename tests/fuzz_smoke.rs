@@ -45,7 +45,16 @@ fn random_records_preserve_text() {
         }
         let mut reader = Cursor::new(&input);
         let mut output = Vec::new();
-        filter(&mut reader, &mut output, &profile, &palette, true, 64).unwrap();
+        filter(
+            &mut reader,
+            &mut output,
+            &profile,
+            &palette,
+            true,
+            64,
+            false,
+        )
+        .unwrap();
         assert_eq!(
             strip_sgr(&output),
             input,
@@ -56,7 +65,16 @@ fn random_records_preserve_text() {
 
         let mut reader = Cursor::new(&input);
         let mut output = Vec::new();
-        filter(&mut reader, &mut output, &profile, &palette, false, 64).unwrap();
+        filter(
+            &mut reader,
+            &mut output,
+            &profile,
+            &palette,
+            false,
+            64,
+            false,
+        )
+        .unwrap();
         assert_eq!(output, input);
     }
 }

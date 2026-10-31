@@ -15,6 +15,7 @@ pub fn filter<R: BufRead, W: Write>(
     palette: &Palette,
     colour: bool,
     max_record: usize,
+    partial_passthrough: bool,
 ) -> Result<()> {
     if !colour {
         return match io::copy(reader, writer) {
@@ -75,7 +76,8 @@ pub fn filter<R: BufRead, W: Write>(
                     index += 1;
                     continue;
                 }
-                if !put(writer, &record)? || !put(writer, b"\r")? {
+                record.push(b'\r');
+                if !put(writer, &record)? {
                     return Ok(());
                 }
                 record.clear();
@@ -102,7 +104,8 @@ pub fn filter<R: BufRead, W: Write>(
                             index += 2;
                             continue;
                         }
-                        if !put(writer, &record)? || !put(writer, b"\r")? {
+                        record.push(b'\r');
+                        if !put(writer, &record)? {
                             return Ok(());
                         }
                         record.clear();
@@ -115,7 +118,8 @@ pub fn filter<R: BufRead, W: Write>(
                     }
                 }
                 b if is_control(b) => {
-                    if !put(writer, &record)? || !put(writer, &[b])? {
+                    record.push(b);
+                    if !put(writer, &record)? {
                         return Ok(());
                     }
                     record.clear();
@@ -137,10 +141,46 @@ pub fn filter<R: BufRead, W: Write>(
             }
             index += 1;
         }
+
+        if partial_passthrough {
+            if !bypass {
+                if pending_cr {
+                    record.push(b'\r');
+                    if !put(writer, &record)? {
+                        return Ok(());
+                    }
+                    record.clear();
+                    pending_cr = false;
+                    bypass = true;
+                    if !flush(writer)? {
+                        return Ok(());
+                    }
+                } else if !record.is_empty() {
+                    if !put(writer, &record)? {
+                        return Ok(());
+                    }
+                    record.clear();
+                    bypass = true;
+                    if !flush(writer)? {
+                        return Ok(());
+                    }
+                }
+            }
+            if bypass && !bypass_buf.is_empty() {
+                if !put(writer, &bypass_buf)? {
+                    return Ok(());
+                }
+                bypass_buf.clear();
+                if !flush(writer)? {
+                    return Ok(());
+                }
+            }
+        }
     }
 
     if pending_cr {
-        if !put(writer, &record)? || !put(writer, b"\r")? {
+        record.push(b'\r');
+        if !put(writer, &record)? {
             return Ok(());
         }
         record.clear();
@@ -179,29 +219,24 @@ fn emit_record<W: Write>(
     palette: &Palette,
 ) -> Result<bool> {
     if !record.is_empty() {
+        let mut output = Vec::with_capacity(record.len() + 16);
         if let Ok(text) = std::str::from_utf8(record) {
             if !text.chars().any(|ch| ch.is_control() && ch != '\t') {
-                let mut styled = Vec::with_capacity(record.len() + 16);
-                colorize(profile, palette, text, &mut styled);
-                if !put(writer, &styled)? {
-                    return Ok(false);
-                }
-                if !put(writer, terminator)? {
-                    return Ok(false);
-                }
-                record.clear();
-                return Ok(true);
+                colorize(profile, palette, text, &mut output);
+            } else {
+                output.extend_from_slice(record);
             }
+        } else {
+            output.extend_from_slice(record);
         }
-        if !put(writer, record)? {
-            return Ok(false);
-        }
+        output.extend_from_slice(terminator);
+        let ok = put(writer, &output)?;
+        record.clear();
+        return Ok(ok);
     }
-    if !put(writer, terminator)? {
-        return Ok(false);
-    }
+    let ok = put(writer, terminator)?;
     record.clear();
-    Ok(true)
+    Ok(ok)
 }
 
 fn is_control(byte: u8) -> bool {
@@ -231,7 +266,16 @@ mod tests {
         let palette = Palette::default();
         let mut reader = Cursor::new(input);
         let mut out = Vec::new();
-        filter(&mut reader, &mut out, &profile, &palette, colour, max).unwrap();
+        filter(
+            &mut reader,
+            &mut out,
+            &profile,
+            &palette,
+            colour,
+            max,
+            false,
+        )
+        .unwrap();
         out
     }
 
@@ -346,9 +390,29 @@ mod tests {
         let input = b"progress\rnext";
         let mut reader = Cursor::new(input);
         let mut writer = Recorder::default();
-        filter(&mut reader, &mut writer, &profile, &palette, true, 64).unwrap();
+        filter(
+            &mut reader,
+            &mut writer,
+            &profile,
+            &palette,
+            true,
+            64,
+            false,
+        )
+        .unwrap();
         assert_eq!(writer.bytes, input);
         assert_eq!(writer.flushes.first().copied(), Some(b"progress\r".len()));
+    }
+
+    #[test]
+    fn partial_passthrough_flushes_before_next_chunk() {
+        let profile = compiled();
+        let palette = Palette::default();
+        let mut reader = Chunked::new(vec![b"hel".to_vec(), b"lo\n".to_vec()]);
+        let mut writer = Recorder::default();
+        filter(&mut reader, &mut writer, &profile, &palette, true, 64, true).unwrap();
+        assert_eq!(writer.bytes, b"hello\n");
+        assert_eq!(writer.flushes.first().copied(), Some(3));
     }
 
     #[test]
@@ -357,7 +421,16 @@ mod tests {
         let palette = Palette::default();
         let mut reader = Chunked::new(vec![b"progress\r".to_vec(), b"next".to_vec()]);
         let mut writer = Recorder::default();
-        filter(&mut reader, &mut writer, &profile, &palette, true, 64).unwrap();
+        filter(
+            &mut reader,
+            &mut writer,
+            &profile,
+            &palette,
+            true,
+            64,
+            false,
+        )
+        .unwrap();
         assert_eq!(writer.bytes, b"progress\rnext");
         assert_eq!(writer.flushes.first().copied(), Some(b"progress\r".len()));
     }

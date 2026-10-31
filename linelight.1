@@ -1,4 +1,4 @@
-.TH LINELIGHT 1 "2026-10-30" "linelight 2026.10.30" "User Commands"
+.TH LINELIGHT 1 "2026-10-31" "linelight 2026.10.31" "User Commands"
 .SH NAME
 linelight \- add semantic colour to plain command output and logs
 .SH SYNOPSIS
@@ -13,6 +13,22 @@ linelight \- add semantic colour to plain command output and logs
 .IR DIR ]
 .RB [ \-\-palette
 .IR PATH ]
+.br
+.B linelight run
+.B \-\-profile
+.I ID
+.RB [ \-\-color
+.IR auto | always | never ]
+.RB [ \-\-stderr ]
+.RB [ \-\-pty ]
+.B \-\-
+.I COMMAND
+.RI [ ARG ...]
+.br
+.B linelight init
+.I SHELL
+.RB [ \-\-profile-dir
+.IR DIR ]
 .br
 .B linelight profiles
 .RB [ \-\-profile-dir
@@ -34,8 +50,8 @@ linelight \- add semantic colour to plain command output and logs
 .IR PATH ]
 .SH DESCRIPTION
 .B linelight
-is a standalone, unprivileged filter. It adds semantic SGR styles to plain
-UTF-8 records and preserves every other byte.
+is a standalone, unprivileged filter and command runner. It adds semantic SGR
+styles to plain UTF-8 records and preserves every other byte.
 .PP
 Profiles are explicit. The program does not wrap commands, rewrite argv,
 change PATH, export colour environment variables, select replacement
@@ -54,6 +70,22 @@ disables it. Explicit
 and
 .B never
 win.
+.TP
+.B run
+Run a command with stdout, and optionally stderr, filtered. The child keeps
+the caller's stdin and foreground process group. With colour off, the command
+is exec'd directly. Exit status is the child's, or 128+N when the child dies
+from signal N.
+.TP
+.B init
+Print shell wrappers for
+.BR bash ,
+.BR zsh ,
+.BR tcsh ,
+or
+.BR fish .
+Only commands with an effective profile and on PATH are wrapped; existing
+aliases/functions win; `log` is never wrapped and `ls` is off by default.
 .TP
 .B profiles
 List effective profile IDs, names, and sources.
@@ -87,6 +119,18 @@ Additional profile directory. Repeatable; earlier entries take precedence.
 .TP
 .BI \-\-palette\  PATH
 Palette TOML file.
+.TP
+.B \-\-stderr
+For
+.BR run ,
+filter stderr separately with its own destination-based colour decision.
+.TP
+.B \-\-pty
+For
+.BR run ,
+give only stdout a pseudoterminal. stdin, stderr, and the controlling terminal
+stay real. Cannot be combined with
+.BR \-\-stderr .
 .SH PROFILE RESOLUTION
 Explicit file, then
 .I ${XDG_CONFIG_HOME:-$HOME/.config}/linelight/profiles
@@ -100,7 +144,26 @@ or invalid UTF-8 pass through unchanged. LF, CRLF, and a final line without a
 newline are preserved. Progress/control markers flush immediately. Removing
 only inserted SGR sequences yields the original bytes.
 .SH EXIT STATUS
-0 on success, 1 on profile/config/output errors, 2 on usage errors.
+.B filter
+and management commands exit 0 on success, 1 on profile/config/output errors,
+and 2 on usage errors.
+.B run
+returns the child's exit status, or 128+N when the child dies from signal N.
+Command-not-found is 127; permission denied is 126.
+.SH ADAPTER CONFIG
+.B ${XDG_CONFIG_HOME:-$HOME/.config}/linelight/adapters.toml
+can disable individual generated wrappers:
+.PP
+.nf
+schema = 1
+disable = ["ps", "diff"]
+.fi
+.PP
+Set
+.B LINELIGHT_INIT=0
+to make
+.B init
+print nothing.
 .SH SEE ALSO
 .I DESIGN.md
 in the source distribution.

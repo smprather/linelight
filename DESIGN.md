@@ -1,7 +1,7 @@
 # linelight — design
 
 Date: 2026-10-30  
-Status: 2026.10.30, implemented filter-first  
+Status: 2026.10.31, implemented runner and adapters  
 License: MIT
 
 ## Boundary
@@ -22,9 +22,9 @@ user profiles under XDG, and no system-wide or current-directory lookup.
 - no `/etc` installation or sudo requirement;
 - no cache, daemon, service, network access, or persistent state;
 - no implicit command wrapping or PATH shadowing;
-- no PTY or runner before the process model is complete.
+- no runner or PTY without the documented process contract.
 
-## Scope in 2026.10.30
+## Scope in 2026.10.31
 
 Implemented:
 
@@ -32,24 +32,18 @@ Implemented:
 - embedded default profiles;
 - strict, versioned TOML profile schema;
 - semantic palette with user override;
-- `filter`, `profiles`, `explain`, and `check`;
+- `filter`, `run`, `init`, `profiles`, `explain`, and `check`;
+- stdout and optional stderr filtering with independent auto-colour decisions;
+- an optional stdout-only PTY for `run`;
 - byte-preserving record policy;
 - unprivileged, arbitrary-prefix installation with no adjacent files.
 
 Deferred:
 
-- a command runner;
-- PTY support;
-- automatic shell adapters;
 - native capability probing at shell startup;
-- per-profile enable/disable policy for automatic integration;
+- enabling `ls` in generated adapters by default;
+- further profile coverage;
 - downstream package registration.
-
-A transparent alias needs a complete foreground-process-group contract: stdin
-reads, SIGTTIN, Ctrl-Z/SIGCONT, SIGINT, EPIPE, child exit status, descendant
-file descriptors, and terminal restoration. Shipping a pipe-only wrapper before
-that contract is unsafe. The filter is the smallest deliverable; the runner is
-the next phase.
 
 ## Native-color admission
 
@@ -172,7 +166,42 @@ linelight check [PATH...] [--profile-dir DIR] [--palette PATH]
 non-empty `NO_COLOR` or `TERM=dumb`. Explicit `always`/`never` win. A pager
 pipeline uses `--color always`.
 
-There is no `run` subcommand in this release.
+## Runner contract
+
+`run --profile ID [--stderr] [--pty] -- CMD [ARG...]` keeps the child in the
+caller's process group and stdin inherited. With colour off for both streams it
+execs directly. Otherwise it preserves the child status (`128+N` for signal
+`N`), forwards HUP/TERM/QUIT, ignores SIGINT in the parent so the filter can
+drain the child, leaves Ctrl-Z/`fg` to the terminal's process group, sets
+`COLUMNS` from the real terminal when unset, and treats EPIPE as a quiet
+pipeline close. Descendants that keep stdout open keep the filter reading until
+they close, as with a shell pipeline.
+
+`--stderr` adds a separate stderr pipe and makes an independent auto-colour
+decision from stderr's destination. stdout and stderr remain separate streams;
+ordering between them is best effort. A background descendant that keeps
+stdout open keeps the filter reading until it closes, as with a shell pipeline.
+`--pty` gives only stdout a pseudoterminal, clears `OPOST`/`ONLCR`, copies
+`TIOCGWINSZ` on resize, and leaves stdin, stderr, and the controlling terminal
+alone. `--pty` and `--stderr` are separate modes in this release.
+
+## Shell adapters
+
+`init bash|zsh|tcsh|fish` prints wrappers for commands that have an effective
+profile and are on `PATH` at init time. `log` is never wrapped; `ls` is off by
+default. Existing aliases/functions win, collisions are skipped, and
+`LINELIGHT_INIT=0` disables output. `~/.config/linelight/adapters.toml` can
+disable names:
+
+```toml
+schema = 1
+disable = ["ps", "diff"]
+```
+
+Wrappers call `linelight run --profile NAME -- NAME ARGS` and resolve the
+target executable through the shell's ordinary path lookup, so colour-off
+invocations exec directly without a pipe. Bash/Zsh keep name-based completion;
+Fish copies it with `--wraps`.
 
 ## Installation
 
@@ -200,16 +229,17 @@ executable.
 - explicit profile path;
 - `profiles` and `explain` report sources;
 - a real shell pipeline composes through the filter;
+- runner status, signal, stdin, stderr, PTY isatty/window-size, and EPIPE
+  behaviour;
+- adapter generation, disable config, collision handling, and shell syntax;
 - unprivileged install into a prefix with spaces, clean HOME/XDG, and a
   read-only executable.
 
 ## Future work
 
-1. Implement the runner and its complete process/job-control contract.
-2. Add standalone shell adapters (Bash, Zsh, Tcsh, Fish) that preserve native
-   definitions, skip collisions, and can be disabled globally or per command.
-3. Add per-profile enable/disable policy for automatic integration.
-4. Re-audit native defaults per executable build and add profiles only with
-   current fixtures.
-5. Keep downstream packaging and integration out of the core; consume the
+1. Add per-profile enable policy for adapters, including an explicit opt-in for
+   `ls`.
+2. Re-audit native defaults per executable build and add profiles only with
+   current fixtures; grc's command list is not a roadmap.
+3. Keep downstream packaging and integration out of the core; consume the
    released CLI and adapters through their public interfaces.

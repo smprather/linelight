@@ -13,6 +13,10 @@ test -f "$tmp/prefix with spaces/share/man/man1/linelight.1"
 
 "$bin" --version >/dev/null
 "$bin" check >/dev/null
+"$bin" init bash > "$tmp/init.bash"
+bash -n "$tmp/init.bash"
+LINELIGHT_INIT=0 "$bin" init bash > "$tmp/init.off"
+test ! -s "$tmp/init.off"
 
 printf '+x\n' > "$tmp/in"
 env -i HOME=/nonexistent XDG_CONFIG_HOME=/nonexistent PATH=/usr/bin:/bin \

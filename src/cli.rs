@@ -3,9 +3,11 @@ use std::ffi::OsString;
 use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 
+use crate::adapters;
 use crate::error::{Error, Result};
 use crate::framer;
 use crate::profile::{parse_profile_file, resolve, CompiledProfile, ProfileSet};
+use crate::runner::{self, RunOptions};
 use crate::style::Palette;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,9 +41,27 @@ enum Command {
     Help,
     Version,
     Filter(FilterArgs),
+    Run(RunArgs),
+    Init(InitArgs),
     Profiles(Vec<PathBuf>),
     Explain(ExplainArgs),
     Check(CheckArgs),
+}
+
+struct InitArgs {
+    shell: String,
+    profile_dirs: Vec<PathBuf>,
+}
+
+struct RunArgs {
+    profile: String,
+    colour: ColourMode,
+    max_record: usize,
+    stderr: bool,
+    pty: bool,
+    palette: Option<PathBuf>,
+    profile_dirs: Vec<PathBuf>,
+    command: Vec<OsString>,
 }
 
 pub fn run() -> i32 {
@@ -66,6 +86,8 @@ pub fn run() -> i32 {
             Ok(0)
         }
         Ok(Command::Filter(args)) => filter_main(args),
+        Ok(Command::Run(args)) => run_main(args),
+        Ok(Command::Init(args)) => init_main(args),
         Ok(Command::Profiles(dirs)) => profiles_main(&dirs),
         Ok(Command::Explain(args)) => explain_main(args),
         Ok(Command::Check(args)) => check_main(args),
@@ -102,7 +124,53 @@ fn filter_main(args: FilterArgs) -> Result<i32> {
         &palette,
         colour,
         args.max_record,
+        false,
     )?;
+    Ok(0)
+}
+
+fn run_main(args: RunArgs) -> Result<i32> {
+    let palette = Palette::load(args.palette.as_deref())?;
+    let (raw, warnings) = resolve(&args.profile, &args.profile_dirs)?;
+    for warning in warnings {
+        eprintln!("linelight: warning: {}", warning);
+    }
+    let profile = raw.compile(&palette)?;
+
+    let stdout_colour = match args.colour {
+        ColourMode::Always => true,
+        ColourMode::Never => false,
+        ColourMode::Auto => io::stdout().is_terminal() && auto_environment_allows(),
+    };
+    let stderr_colour = args.stderr
+        && match args.colour {
+            ColourMode::Always => true,
+            ColourMode::Never => false,
+            ColourMode::Auto => io::stderr().is_terminal() && auto_environment_allows(),
+        };
+    if args.pty && args.stderr {
+        return Err(Error::usage("--pty cannot be combined with --stderr"));
+    }
+    runner::run(RunOptions {
+        command: args.command,
+        profile,
+        palette,
+        max_record: args.max_record,
+        stderr: args.stderr,
+        pty: args.pty,
+        color_stdout: stdout_colour,
+        color_stderr: stderr_colour,
+    })
+}
+
+fn init_main(args: InitArgs) -> Result<i32> {
+    if env::var("LINELIGHT_INIT")
+        .map(|value| value == "0")
+        .unwrap_or(false)
+    {
+        return Ok(0);
+    }
+    print!("{}", adapters::generate(&args.shell, &args.profile_dirs)?);
     Ok(0)
 }
 
@@ -218,6 +286,8 @@ fn parse(args: &[OsString]) -> Result<Command> {
         "--help" | "-h" | "help" => Ok(Command::Help),
         "--version" | "version" => Ok(Command::Version),
         "filter" => parse_filter(&args[1..]),
+        "run" => parse_run(&args[1..]),
+        "init" => parse_init(&args[1..]),
         "profiles" => parse_profiles(&args[1..]),
         "explain" => parse_explain(&args[1..]),
         "check" => parse_check(&args[1..]),
@@ -275,6 +345,100 @@ fn parse_filter(args: &[OsString]) -> Result<Command> {
         colour,
         max_record,
         palette,
+        profile_dirs,
+    }))
+}
+
+fn parse_run(args: &[OsString]) -> Result<Command> {
+    let mut profile = None;
+    let mut colour = ColourMode::Auto;
+    let mut max_record = 65536;
+    let mut stderr = false;
+    let mut pty = false;
+    let mut palette = None;
+    let mut profile_dirs = Vec::new();
+    let mut command = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        let text = args[index].to_string_lossy();
+        if text == "--" {
+            command = args[index + 1..].to_vec();
+            break;
+        }
+        if text == "--profile" {
+            index += 1;
+            profile = Some(required(args, index, "--profile")?);
+        } else if let Some(value) = text.strip_prefix("--profile=") {
+            profile = Some(value.to_string());
+        } else if text == "--color" {
+            index += 1;
+            colour = parse_colour(&required(args, index, "--color")?)?;
+        } else if let Some(value) = text.strip_prefix("--color=") {
+            colour = parse_colour(value)?;
+        } else if text == "--max-record" {
+            index += 1;
+            max_record = parse_usize(&required(args, index, "--max-record")?, "--max-record")?;
+        } else if let Some(value) = text.strip_prefix("--max-record=") {
+            max_record = parse_usize(value, "--max-record")?;
+        } else if text == "--stderr" {
+            stderr = true;
+        } else if text == "--pty" {
+            pty = true;
+        } else if text == "--palette" {
+            index += 1;
+            palette = Some(PathBuf::from(required(args, index, "--palette")?));
+        } else if let Some(value) = text.strip_prefix("--palette=") {
+            palette = Some(PathBuf::from(value));
+        } else if text == "--profile-dir" {
+            index += 1;
+            profile_dirs.push(PathBuf::from(required(args, index, "--profile-dir")?));
+        } else if let Some(value) = text.strip_prefix("--profile-dir=") {
+            profile_dirs.push(PathBuf::from(value));
+        } else if text.starts_with('-') {
+            return Err(Error::usage(format!("unknown run option `{}`", text)));
+        } else {
+            command = args[index..].to_vec();
+            break;
+        }
+        index += 1;
+    }
+    let profile = profile.ok_or_else(|| Error::usage("run requires --profile"))?;
+    if command.is_empty() {
+        return Err(Error::usage("run requires a command after `--`"));
+    }
+    Ok(Command::Run(RunArgs {
+        profile,
+        colour,
+        max_record,
+        stderr,
+        pty,
+        palette,
+        profile_dirs,
+        command,
+    }))
+}
+
+fn parse_init(args: &[OsString]) -> Result<Command> {
+    let Some(shell) = args.first() else {
+        return Err(Error::usage("init requires bash, zsh, tcsh, or fish"));
+    };
+    let shell = shell.to_string_lossy().into_owned();
+    let mut profile_dirs = Vec::new();
+    let mut index = 1;
+    while index < args.len() {
+        let text = args[index].to_string_lossy();
+        if text == "--profile-dir" {
+            index += 1;
+            profile_dirs.push(PathBuf::from(required(args, index, "--profile-dir")?));
+        } else if let Some(value) = text.strip_prefix("--profile-dir=") {
+            profile_dirs.push(PathBuf::from(value));
+        } else {
+            return Err(Error::usage(format!("unknown init option `{}`", text)));
+        }
+        index += 1;
+    }
+    Ok(Command::Init(InitArgs {
+        shell,
         profile_dirs,
     }))
 }
@@ -401,6 +565,8 @@ fn print_help() {
     println!(
         "linelight {}\n\
          usage: linelight filter --profile ID [options]\n\
+                linelight run --profile ID [options] -- COMMAND [ARG...]\n\
+                linelight init bash|zsh|tcsh|fish [--profile-dir DIR]\n\
                 linelight profiles [--profile-dir DIR]\n\
                 linelight explain --profile ID [--profile-dir DIR]\n\
                 linelight check [PATH...] [--profile-dir DIR]\n\
@@ -411,6 +577,22 @@ fn print_help() {
            --max-record N      bypass records longer than N bytes (default 65536)\n\
            --palette PATH      palette file\n\
            --profile-dir DIR   extra profile directory (highest precedence first)\n\
+         \n\
+         run options:\n\
+           --profile ID|PATH   profile id or explicit .toml file\n\
+           --color MODE        auto (default), always, or never\n\
+           --max-record N      bypass records longer than N bytes (default 65536)\n\
+           --stderr            also filter stderr (separate stream)\n\
+           --pty               give the command a pty on stdout\n\
+           --palette PATH      palette file\n\
+           --profile-dir DIR   extra profile directory (highest precedence first)\n\
+         \n\
+         init emits shell wrappers for commands that have an effective profile
+\
+         and are on PATH. Existing aliases/functions are left alone; ls is off
+\
+         by default and log is never wrapped.
+\
          \n\
          Profiles are embedded, overridden by $XDG_CONFIG_HOME/linelight/profiles,\n\
          and may be supplemented by --profile-dir. No configuration is read from\n\

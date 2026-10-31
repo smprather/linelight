@@ -336,3 +336,42 @@ fn shell_pipeline_composes_with_filter() {
     assert!(output.status.success(), "{:?}", output);
     assert_eq!(output.stdout, b"\x1b[0;32m+\x1b[0mx\n");
 }
+
+#[test]
+fn init_lists_only_effective_command_profiles() {
+    let xdg = isolated();
+    let output = run(&xdg, &["init", "bash"], b"");
+    assert!(output.status.success(), "{:?}", output);
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.contains("--profile df"));
+    assert!(!text.contains("--profile ls "));
+    assert!(!text.contains("--profile log"));
+
+    let output = Command::new(bin())
+        .args(["init", "bash"])
+        .env("XDG_CONFIG_HOME", xdg.path())
+        .env("HOME", xdg.path())
+        .env("LINELIGHT_INIT", "0")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
+fn init_honours_disable_config() {
+    let xdg = isolated();
+    let dir = xdg.path().join("linelight");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("adapters.toml"),
+        "schema = 1\ndisable = [\"ps\", \"diff\"]\n",
+    )
+    .unwrap();
+    let output = run(&xdg, &["init", "bash"], b"");
+    assert!(output.status.success(), "{:?}", output);
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(!text.contains("--profile ps"));
+    assert!(!text.contains("--profile diff"));
+    assert!(text.contains("--profile df"));
+}

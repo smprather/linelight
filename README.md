@@ -4,7 +4,7 @@
 
 **Put your output in the limelight.**
 
-A command-line filter that makes plain logs and command output easier to scan.
+A command-line filter and runner that make plain logs and command output easier to scan.
 
 [Get started](#get-started) · [Examples](#examples) · [Profiles](#profiles) · [Customization](#customization)
 
@@ -88,6 +88,33 @@ diff -u old.txt new.txt |
 In Bash or Zsh scripts, use `set -o pipefail` when the source command's exit
 status matters. The shell determines the status of the pipeline.
 
+## Run a command
+
+`run` puts the same filter around a child process:
+
+```sh
+linelight run --profile df -- df -h
+linelight run --profile log --stderr -- make
+linelight run --profile ps --pty -- ps aux
+```
+
+The profile is explicit; there is no command-line matcher hidden behind the
+runner. With colour off for both streams, `run` execs the command directly with
+no pipe. Otherwise it forwards the child's exit status (or `128+N` when the
+child dies from signal `N`), forwards HUP/TERM/QUIT, and leaves the child in the
+terminal's foreground process group so Ctrl-C, Ctrl-Z, and `fg` behave like the
+plain command. Stdin is inherited.
+
+`--stderr` filters stderr separately, using its own destination to make the
+auto-colour decision. The streams stay separate; ordering between them is best
+effort. `--pty` gives only stdout a pseudoterminal, preserving `isatty(1)`, line
+buffering, and terminal width; stdin and stderr remain real. `--pty` and
+`--stderr` are not combined in this release. Partial records are passed through
+by `run` so prompts without a trailing newline remain visible; this can leave a
+record unstyled if it arrives in pieces. A background descendant that keeps
+stdout open also keeps the filter reading until it closes, exactly as in a shell
+pipeline.
+
 ## Profiles
 
 Every profile below is included in the binary; configuration is optional.
@@ -126,9 +153,10 @@ ANSI escapes, control bytes, or invalid UTF-8 pass through unchanged, as do
 records reaching the default 64 KiB limit. Change the limit with `--max-record N`.
 
 > [!NOTE]
-> Linelight 2026.10.30 is a line-oriented filter. Ordinary partial lines wait for a
-> newline, EOF, or the record limit. Progress displays that redraw the same line
-> can be delayed; complete-line logs and tables are the intended inputs.
+> `filter` is a line-oriented filter. Ordinary partial lines wait for a newline,
+> EOF, or the record limit; progress/control markers flush immediately. `run`
+> passes partial records through so prompts remain visible; a record that
+> arrives in pieces can be left unstyled.
 
 ## Customization
 
@@ -204,11 +232,39 @@ Your terminal's palette determines how the colors look.
 For a one-off palette, pass `--palette ./palette.toml` to `filter`, `explain`,
 or `check`.
 
+## Shell adapters
+
+`init` prints wrapper definitions for the interactive shell:
+
+```sh
+eval "$(linelight init bash)"       # ~/.bashrc
+eval "$(linelight init zsh)"        # ~/.zshrc
+eval "`linelight init tcsh`"        # ~/.tcshrc
+linelight init fish | source        # config.fish
+```
+
+Only commands that have an effective profile and are on `PATH` when `init`
+runs are wrapped. `log` is never wrapped, and `ls` is off by default because
+many users already define it. Existing aliases and functions win. Disable
+individual names in `~/.config/linelight/adapters.toml`:
+
+```toml
+schema = 1
+disable = ["ps", "diff"]
+```
+
+Set `LINELIGHT_INIT=0` to make `init` print nothing. The wrappers call
+`linelight run --profile NAME -- NAME ARGS`, so they make no colour decision
+themselves and exec directly when colour is off. Bash and Zsh keep their
+name-based completion; Fish copies completion with `--wraps`.
+
 ## Command reference
 
 | Command | Purpose |
 | --- | --- |
 | `linelight filter --profile ID` | Read stdin and write styled text to stdout |
+| `linelight run --profile ID -- COMMAND` | Run a command through the filter |
+| `linelight init SHELL` | Print shell wrappers |
 | `linelight profiles` | List effective profiles and their sources |
 | `linelight explain --profile ID` | Show a profile's source, palette, and rules |
 | `linelight check [PATH...]` | Validate profile files, or all effective profiles and the palette |
