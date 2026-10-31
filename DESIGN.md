@@ -231,7 +231,8 @@ executable.
 - a real shell pipeline composes through the filter;
 - runner status, signal, stdin, stderr, PTY isatty/window-size, and EPIPE
   behaviour;
-- adapter generation, disable config, collision handling, and shell syntax;
+- adapter generation, disable config, collision handling, shell syntax, and
+  seeded completion survival in bash, zsh, tcsh, and fish;
 - unprivileged install into a prefix with spaces, clean HOME/XDG, and a
   read-only executable.
 

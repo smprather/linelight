@@ -17,6 +17,7 @@ check:
 	$(CARGO) test
 	$(CARGO) build --release
 	./target/release/linelight check
+	./tests/completion.sh
 
 install: build
 	PREFIX=$(PREFIX) ./install.sh
@@ -26,3 +27,6 @@ clean:
 
 deploy-test: build
 	./tests/deploy.sh
+
+completion-test: build
+	./tests/completion.sh
