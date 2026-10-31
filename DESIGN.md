@@ -1,7 +1,7 @@
 # linelight — design
 
 Date: 2026-10-30  
-Status: 2026.10.31, implemented runner and adapters  
+Status: 2026.10.31-1, implemented runner and adapters  
 License: MIT
 
 ## Boundary
@@ -24,7 +24,7 @@ user profiles under XDG, and no system-wide or current-directory lookup.
 - no implicit command wrapping or PATH shadowing;
 - no runner or PTY without the documented process contract.
 
-## Scope in 2026.10.31
+## Scope in 2026.10.31-1
 
 Implemented:
 
