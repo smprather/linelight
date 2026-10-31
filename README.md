@@ -1,209 +1,217 @@
-# linelight
+<div align="center">
 
-A standalone, unprivileged output colorizer for plain command output and logs.
+# Linelight
 
-`linelight` adds readable emphasis to text that has no adequate native color.
-It is deliberately explicit: it does not wrap commands, rewrite argv, change
-PATH, export color environment variables, or select replacement utilities.
+**Put your output in the limelight.**
 
-**Status: v0.1, filter-first.** The filter, embedded profiles, strict TOML
-schema, `profiles`, `explain`, and `check` commands are implemented. A command
-runner, PTY support, and automatic shell adapters are not yet shipped; they
-need a complete process-group and job-control contract first.
+A command-line filter that makes plain logs and command output easier to scan.
 
-## Build
+[Get started](#get-started) · [Examples](#examples) · [Profiles](#profiles) · [Customization](#customization)
+
+</div>
+
+![The same three log lines before and after Linelight: INFO in green, WARN in yellow, ERROR in red, with addresses and paths highlighted.](docs/images/log-demo.svg)
+
+Pipe in text and choose a profile. Linelight highlights useful details while
+preserving the original text. All 11 built-in profiles travel with the binary,
+which runs on its own on a compatible remote host.
+
+## Get started
+
+Build from source on Linux with Git, a [stable Rust toolchain](https://rust-lang.org/tools/install/),
+and a system linker:
 
 ```sh
-cargo build --release
-```
-
-The result is one executable, `target/release/linelight`. All default profiles
-are embedded, so the binary works with no adjacent files.
-
-## Install
-
-```sh
+git clone https://github.com/smprather/linelight.git
+cd linelight
+cargo build --release --locked
 ./install.sh
 ```
 
-The default prefix is `$HOME/.local`; no sudo, `/etc`, package manager, service,
-setuid bit, or capability is required. Override with `PREFIX`, `DESTDIR`,
-`BINDIR`, or `MANDIR`.
+Installation needs no sudo: the executable goes in `~/.local/bin`, the manual
+in `~/.local/share/man`. Add `~/.local/bin` to your `PATH` for the examples below.
 
-## Use
-
-Explicit filter, always-colour for a pager pipeline:
+Try it in your terminal:
 
 ```sh
-df -h | linelight filter --profile df --color always | less -R
-journalctl -n 200 --no-pager | linelight filter --profile log --color always
-diff -u old new | linelight filter --profile diff --color always
+printf '%s\n' \
+    'INFO  listening on 127.0.0.1:8080' \
+    'WARN  retrying /api/search' \
+    'ERROR database unavailable' |
+    ~/.local/bin/linelight filter --profile log
 ```
 
-When stdout is not a tty, the default `--color auto` adds no colour. `NO_COLOR`
-(non-empty) and `TERM=dumb` also disable auto colour. Explicit `always` and
-`never` win.
+Rust is needed only for building; the installed binary runs offline.
 
-Profiles are explicitly requested. `linelight` never decides on its own to
-color a command or a stream.
+<details>
+<summary>Use a different install location</summary>
+
+```sh
+env PREFIX="$HOME/tools/linelight" ./install.sh
+"$HOME/tools/linelight/bin/linelight" --version
+```
+
+The installer also accepts `BINDIR`, `MANDIR`, and `DESTDIR`. To try Linelight
+without installing, use `./target/release/linelight`.
+
+</details>
+
+## Examples
+
+**Read command output:**
+
+```sh
+df -h | linelight filter --profile df
+ps aux | linelight filter --profile ps
+ss -ltn | linelight filter --profile ss
+```
+
+**Read a log file, or follow it as it grows:**
+
+```sh
+linelight filter --profile log < app.log
+tail -f app.log | linelight filter --profile log
+```
+
+**Keep color when using a pager:**
+
+```sh
+diff -u old.txt new.txt |
+    linelight filter --profile diff --color always |
+    less -R
+```
+
+> [!TIP]
+> Auto mode checks Linelight's **output**. When piping to `less -R`, use
+> `--color always`; when redirecting to a file, leave auto mode on for plain text.
+
+In Bash or Zsh scripts, use `set -o pipefail` when the source command's exit
+status matters. The shell determines the status of the pipeline.
 
 ## Profiles
 
-Embedded IDs:
+Every profile below is included in the binary; configuration is optional.
 
-| ID | Target | Native-color note |
-|---|---|---|
-| `df` | GNU df | native colour off by default |
-| `free` | procps free | no native colour |
-| `ps` | procps ps | `PS_COLORS` unsupported |
-| `ss` | iproute2 ss | no native colour for table output |
-| `ping` | iputils ping | ordinary line output only |
-| `dig` | BIND dig | human answer output only |
-| `sensors` | lm-sensors | display only |
-| `ls` | GNU ls -l | native colour is opt-in |
-| `diff` | GNU diff | native colour is opt-in |
-| `lsblk` | util-linux lsblk | `--highlight` is opt-in |
-| `log` | explicit logs | custom filter use case |
+| Profile | Use with |
+| --- | --- |
+| [`log`](profiles/log.toml) | Line-oriented application logs |
+| [`df`](profiles/df.toml) | GNU filesystem-usage tables |
+| [`diff`](profiles/diff.toml) | Unified `diff -u` output |
+| [`dig`](profiles/dig.toml) | BIND DNS answers |
+| [`free`](profiles/free.toml) | procps memory summaries |
+| [`ls`](profiles/ls.toml) | GNU `ls -l` with English date formatting |
+| [`lsblk`](profiles/lsblk.toml) | util-linux block-device trees |
+| [`ping`](profiles/ping.toml) | Ordinary iputils ping output |
+| [`ps`](profiles/ps.toml) | procps process tables |
+| [`sensors`](profiles/sensors.toml) | lm-sensors Celsius readings |
+| [`ss`](profiles/ss.toml) | iproute2 socket tables |
 
-### Native-color policy
+Profiles target output that is plain by default; opt-in native color does not
+disqualify a profile. Prefer native output when a command already colors its
+ordinary terminal output well.
 
-A command is eligible for a fallback profile only when its ordinary invocation
-does not already supply adequate color, including default auto/TTY detection.
-Opt-in flags, format strings, loggers, and enabling environment variables do
-not count. Build-dependent defaults require a verified build.
+## Color and streaming
 
-Commands with adequate default native color are not profiled. That is why
-there are no profiles here for tools such as `journalctl`, `systemctl`, `dnf`,
-`mvn`, `iostat`, `sar`, or default-auto builds of `ip`, `gcc`, and `fdisk`.
+| Mode | Behavior |
+| --- | --- |
+| `--color auto` (default) | Adds color when stdout is a terminal and the environment allows it |
+| `--color always` | Adds color even through a pipe or into a file |
+| `--color never` | Copies input without adding color |
 
-## Profile format
+A nonempty `NO_COLOR` or `TERM=dumb` disables auto color. An explicit
+`--color always` or `--color never` takes precedence.
 
-Profiles are versioned TOML, data-only, and strict: unknown fields, duplicate
-keys, unknown semantic styles, missing capture groups, and invalid regexes are
-errors.
+Line endings and a missing final newline are preserved. Records containing
+ANSI escapes, control bytes, or invalid UTF-8 pass through unchanged, as do
+records reaching the default 64 KiB limit. Change the limit with `--max-record N`.
+
+> [!NOTE]
+> Linelight 2026.10.30 is a line-oriented filter. Ordinary partial lines wait for a
+> newline, EOF, or the record limit. Progress displays that redraw the same line
+> can be delayed; complete-line logs and tables are the intended inputs.
+
+## Customization
+
+User configuration lives in `~/.config/linelight`, or under your configured
+`XDG_CONFIG_HOME` root.
+
+### Add a profile
+
+Profiles are TOML files pairing regular expressions with named styles. For a
+tool that prints build-check results, save this as `build.toml`:
 
 ```toml
 schema = 1
-id = "diff"
-name = "GNU diff"
-description = "Unified and normal diff output."
+id = "build"
+name = "Build checks"
 
 [[rule]]
-regex = '^\+'
+regex = '^PASS\b'
 style = "success"
 
 [[rule]]
-regex = '^@@'
-style = "heading"
+regex = '^FAIL\b'
+style = "error"
 ```
 
-Styles are semantic: `heading`, `muted`, `accent`, `identifier`, `path`,
-`number`, `success`, `warning`, `error`. Rules apply in order; named groups can
-override the whole-match style:
+Validate it, then try it:
 
-```toml
-[[rule]]
-regex = '^(?P<user>\S+)\s+(?P<pid>\d+)\s'
-groups = { user = "identifier", pid = "number" }
+```sh
+linelight check ./build.toml
+printf 'PASS compile\nFAIL timing check\n' |
+    linelight filter --profile ./build.toml
 ```
 
-No profile can execute commands, write files, import from the current
-directory, replace or discard text, or emit arbitrary terminal control
-sequences. The only bytes added are SGR style runs.
+Keep it as `~/.config/linelight/profiles/build.toml` to select it by name with
+`--profile build`.
 
-## Palette
+Later rules override earlier styles. Named groups can style parts of a match;
+the [built-in profiles](profiles/) show how.
+Available styles are `heading`, `muted`, `accent`, `identifier`, `path`,
+`number`, `success`, `warning`, and `error`. Profiles are data-only; they cannot
+execute commands or rewrite text.
 
-The shared palette is configurable with
-`${XDG_CONFIG_HOME:-$HOME/.config}/linelight/palette.toml` or `--palette`:
+<details>
+<summary>Profile lookup and overrides</summary>
+
+Linelight looks for a requested profile in this order:
+
+1. An explicit file, such as `--profile ./build.toml`.
+2. The user profile directory under `XDG_CONFIG_HOME` or `~/.config`.
+3. Directories supplied with `--profile-dir DIR`, highest priority first.
+4. The embedded defaults.
+
+Files in profile directories must be named `<id>.toml` and declare that ID.
+Overrides replace whole profiles; a broken requested override reports an error.
+
+</details>
+
+### Change the colors
+
+Create `~/.config/linelight/palette.toml`:
 
 ```toml
 [palette]
-error = "bold red"
+error = "bold bright_red"
 warning = "yellow"
+path = "underline cyan"
 ```
 
-Palette values are token lists such as `bold red` or `dim`; raw escape
-sequences are rejected.
+Entries change styles across all profiles; omitted entries keep their defaults.
+Combine named colors with attributes such as `bold`, `dim`, and `underline`.
+Your terminal's palette determines how the colors look.
 
-## Resolution
+For a one-off palette, pass `--palette ./palette.toml` to `filter`, `explain`,
+or `check`.
 
-Profile lookup, highest precedence first:
+## Command reference
 
-1. an explicitly named `.toml` file passed to `--profile`
-2. user overrides in `${XDG_CONFIG_HOME:-$HOME/.config}/linelight/profiles`
-3. each `--profile-dir` (highest precedence first)
-4. embedded defaults
+| Command | Purpose |
+| --- | --- |
+| `linelight filter --profile ID` | Read stdin and write styled text to stdout |
+| `linelight profiles` | List effective profiles and their sources |
+| `linelight explain --profile ID` | Show a profile's source, palette, and rules |
+| `linelight check [PATH...]` | Validate profile files, or all effective profiles and the palette |
 
-Overrides replace a profile by stable ID as a whole. A user or `--profile-dir`
-file must be named `<id>.toml` and declare that same ID; a broken override fails
-closed instead of silently falling back. There is no system-wide or implicit
-current-directory lookup.
-
-Palette lookup:
-
-1. `--palette PATH`
-2. `${XDG_CONFIG_HOME:-$HOME/.config}/linelight/palette.toml`
-3. built-in palette
-
-## Commands
-
-```text
-linelight filter --profile ID [--color auto|always|never] [--max-record N]
-linelight profiles [--profile-dir DIR]
-linelight explain --profile ID [--profile-dir DIR] [--palette PATH]
-linelight check [PATH...] [--profile-dir DIR] [--palette PATH]
-```
-
-`check` with no paths validates every effective profile and the palette.
-`explain` reports the source, effective palette, rules, and styles.
-
-## Byte-preservation policy
-
-Removing only the SGR sequences inserted by `linelight` yields the original
-bytes. The filter:
-
-- preserves LF, CRLF, and a final line without a newline;
-- passes through entire records containing ESC/ANSI, NUL, other control bytes,
-  lone carriage returns/progress updates, or invalid UTF-8;
-- bounds records to `--max-record` (default 65536); an oversized record is
-  streamed unchanged until the next LF;
-- flushes on control/progress markers instead of waiting indefinitely for LF;
-- holds ordinary partial lines until LF, EOF, or `--max-record`; there is no
-  timer-based flush in v0.1;
-- never splits a UTF-8 scalar to insert a style.
-
-## Development
-
-```sh
-cargo fmt -- --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-./tests/deploy.sh
-target/debug/linelight check
-```
-
-Fixtures live in `tests/fixtures`. The suite covers profile compilation,
-fixture text preservation, style semantics, CLI resolution, user and directory
-overrides, palette overrides, ANSI/control bypass, CRLF, invalid UTF-8,
-oversized records, progress-marker flushes, shell pipeline composition, and
-byte-exact `--color never` output.
-
-`tests/deploy.sh` verifies an unprivileged install into a prefix containing
-spaces, a clean HOME/XDG environment, and a read-only executable.
-
-## Measured locally
-
-Release build on x86_64 Linux, 20–30 runs or a 27 MB log corpus:
-
-| Case | Result |
-|---|---|
-| `linelight --version` startup | 0.72 ms mean |
-| `log` profile, `--color always` | 26.1 MB/s |
-| `log` profile, `--color never` | 3.5 GB/s (byte copy) |
-| RSS at startup | ~3.3 MiB |
-
-These are local measurements, not release gates.
-
-## License
-
-MIT. See `LICENSE`.
+Run `linelight --help` for options, or `man linelight` after installation.
+See the [manual source](linelight.1) and [design notes](DESIGN.md) for more detail.

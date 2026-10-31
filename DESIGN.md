@@ -1,7 +1,7 @@
 # linelight — design
 
 Date: 2026-10-30  
-Status: implemented v0.1, filter-first  
+Status: 2026.10.30, implemented filter-first  
 License: MIT
 
 ## Boundary
@@ -24,7 +24,7 @@ user profiles under XDG, and no system-wide or current-directory lookup.
 - no implicit command wrapping or PATH shadowing;
 - no PTY or runner before the process model is complete.
 
-## Scope in v0.1
+## Scope in 2026.10.30
 
 Implemented:
 
@@ -151,7 +151,7 @@ The filter operates on bounded records:
   until LF;
 - ordinary final partial records are styled at EOF;
 - ordinary partial lines are held until LF, EOF, or `--max-record`; there is no
-  timer-based flush in v0.1, while progress/control markers flush immediately;
+  timer-based flush in this release, while progress/control markers flush immediately;
 - matches run on valid UTF-8 strings, so SGR insertion never splits a scalar;
 - `--color never` is a byte-exact copy.
 
@@ -172,7 +172,7 @@ linelight check [PATH...] [--profile-dir DIR] [--palette PATH]
 non-empty `NO_COLOR` or `TERM=dumb`. Explicit `always`/`never` win. A pager
 pipeline uses `--color always`.
 
-There is no `run` subcommand in v0.1.
+There is no `run` subcommand in this release.
 
 ## Installation
 
