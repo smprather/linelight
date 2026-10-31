@@ -19,23 +19,57 @@ jobs:
         run: dnf -y install rust cargo gcc binutils tar ca-certificates
       - name: Build
         run: cargo build --release --locked
-      - name: Verify glibc floor and NEEDED set
+      - name: Build the exact release tarball
+        run: ./scripts/package-release.sh target/release/linelight "${GITHUB_REF_NAME#v}" dist
+      - name: Verify the packaged tarball
         run: |
-          max=$(objdump -T target/release/linelight | grep -o 'GLIBC_[0-9.]*' | sed 's/^GLIBC_//' | sort -V | tail -1)
+          (cd dist && sha256sum -c ./*.sha256)
+          mkdir extracted
+          tar -xzf dist/*.tar.gz -C extracted
+          bin=$(find extracted -type f -path '*/bin/linelight' | head -n 1)
+          test -x "$bin"
+          max=$(objdump -T "$bin" | grep -o 'GLIBC_[0-9.]*' | sed 's/^GLIBC_//' | sort -V | tail -1)
           test -n "$max"
           test "$(printf '%s\n' "$max" 2.28 | sort -V | tail -1)" = "2.28"
           allowed='libc.so.6 libm.so.6 libpthread.so.0 libdl.so.2 libgcc_s.so.1 ld-linux-x86-64.so.2'
-          for needed in $(objdump -p target/release/linelight | awk '/NEEDED/{print $2}'); do
+          for needed in $(objdump -p "$bin" | awk '/NEEDED/{print $2}'); do
             case " $allowed " in
               *" $needed "*) ;;
               *) echo "unexpected NEEDED: $needed"; exit 1 ;;
             esac
           done
-      - name: Smoke on AlmaLinux 8
+      - name: Smoke the extracted package on AlmaLinux 8
         run: |
-          target/release/linelight --version
-          target/release/linelight check
+          bin=$(find extracted -type f -path '*/bin/linelight' | head -n 1)
+          "$bin" --version
+          "$bin" check
           printf 'Filesystem Size Used Avail Use%% Mounted on\n/dev/sda1 100G 1G 99G 1%% /\n' \
-            | target/release/linelight filter --profile df --color always \
+            | "$bin" filter --profile df --color always \
             | grep -q $'\033'
-          target/release/linelight run --profile df -- df -h | grep -q Filesystem
+          "$bin" run --profile df -- df -h | grep -q Filesystem
+      - name: Upload the release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linelight-glibc228
+          path: dist/*
+
+  publish:
+    needs: glibc228
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linelight-glibc228
+          path: dist
+      - name: Publish the exact CI-built assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "linelight $version" --notes "Release $version"
+          fi
+          gh release upload "$tag" dist/*.tar.gz dist/*.sha256 --clobber

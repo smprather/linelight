@@ -206,8 +206,9 @@ Fish copies it with `--wraps`.
 ## Installation
 
 Single binary with embedded profiles. The released Linux x86_64 build is linked
-against glibc 2.28 (the EL8 floor), verified by symbol version and NEEDED set,
-and smoke-tested on AlmaLinux 8. Default prefix `$HOME/.local`; no sudo, `/etc`,
+against glibc 2.28 (the EL8 floor). The tag release workflow builds the exact
+tarball, verifies the extracted binary by symbol version and NEEDED set,
+smoke-tests it on AlmaLinux 8, and publishes that artifact. Default prefix `$HOME/.local`; no sudo, `/etc`,
 package manager, service, setuid bit, capability, writable install directory,
 cache, or network. Custom XDG roots and arbitrary prefixes
 (including spaces) work. A read-only shared tree needs no writes beside the

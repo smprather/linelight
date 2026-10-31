@@ -44,8 +44,9 @@ printf '%s\n' \
 Rust is needed only for building; the installed binary runs offline. Published
 Linux x86_64 release binaries are linked against glibc 2.28 (the EL8 floor) and
 are smoke-tested on AlmaLinux 8. Build that artifact locally with
-`./scripts/build-glibc228.sh`; the release workflow verifies the symbol floor
-and NEEDED set on every tag.
+`./scripts/build-glibc228.sh`; the tag release workflow builds the exact tarball,
+verifies the extracted binary's symbol floor and NEEDED set, smoke-tests it on
+AlmaLinux 8, and publishes that artifact.
 
 <details>
 <summary>Use a different install location</summary>

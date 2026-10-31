@@ -35,4 +35,6 @@ for needed in $(objdump -p "$binary" | awk '/NEEDED/{print $2}'); do
 done
 mkdir -p target/release
 cp "$binary" target/release/linelight-glibc228
+version=$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)
+./scripts/package-release.sh target/release/linelight-glibc228 "$version" dist
 echo "glibc 2.28 build ok (max GLIBC_$max)"
