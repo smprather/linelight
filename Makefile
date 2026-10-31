@@ -1,7 +1,7 @@
 PREFIX ?= $(HOME)/.local
 CARGO ?= cargo
 
-.PHONY: all build test check install clean
+.PHONY: all build test check install clean next-version
 
 all: build
 
@@ -11,7 +11,11 @@ build:
 test:
 	$(CARGO) test
 
+next-version:
+	./scripts/next-version.sh
+
 check:
+	./tests/version.sh
 	$(CARGO) fmt -- --check
 	$(CARGO) clippy --all-targets -- -D warnings
 	$(CARGO) test

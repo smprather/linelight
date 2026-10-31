@@ -1,7 +1,7 @@
 # linelight — design
 
 Date: 2026-10-30  
-Status: 2026.10.31-1, implemented runner and adapters  
+Status: 2026.10.32, implemented runner and adapters  
 License: MIT
 
 ## Boundary
@@ -24,7 +24,7 @@ user profiles under XDG, and no system-wide or current-directory lookup.
 - no implicit command wrapping or PATH shadowing;
 - no runner or PTY without the documented process contract.
 
-## Scope in 2026.10.31-1
+## Scope in 2026.10.32
 
 Implemented:
 
@@ -213,6 +213,14 @@ package manager, service, setuid bit, capability, writable install directory,
 cache, or network. Custom XDG roots and arbitrary prefixes
 (including spaces) work. A read-only shared tree needs no writes beside the
 executable.
+
+Versions are `YYYY.M.N`: the UTC year and month of the release plus a
+per-month counter that starts at 1. `scripts/next-version.sh` prints the next
+version from the existing `v*` tags, using the highest `N` already present in
+the month so the number never moves backwards when the scheme changes
+mid-month. It refuses shallow or `--no-tags` clones, where older release tags
+are unavailable. The release workflow rejects a tag that does not match `Cargo.toml`
+and `linelight.1`.
 
 ## Acceptance tests
 

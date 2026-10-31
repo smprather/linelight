@@ -17,6 +17,7 @@ jobs:
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - run: ./tests/version.sh
       - run: cargo build --release
       - run: target/release/linelight check
       - run: ./tests/deploy.sh
