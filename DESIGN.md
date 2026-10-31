@@ -240,6 +240,6 @@ executable.
 1. Add per-profile enable policy for adapters, including an explicit opt-in for
    `ls`.
 2. Re-audit native defaults per executable build and add profiles only with
-   current fixtures; grc's command list is not a roadmap.
+   current fixtures; an inherited command list is not a roadmap.
 3. Keep downstream packaging and integration out of the core; consume the
    released CLI and adapters through their public interfaces.
