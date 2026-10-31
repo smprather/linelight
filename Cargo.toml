@@ -5,6 +5,7 @@ edition = "2021"
 rust-version = "1.80"
 license = "MIT"
 description = "Standalone, unprivileged output colorizer with embedded profiles"
+repository = "https://github.com/smprather/linelight"
 
 [dependencies]
 regex = "1.11"
