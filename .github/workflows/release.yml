@@ -1,0 +1,41 @@
+name: release-compat
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  glibc228:
+    runs-on: ubuntu-24.04
+    container: almalinux:8
+    steps:
+      - name: Install git
+        run: dnf -y install git
+      - uses: actions/checkout@v7
+      - name: Install build tools
+        run: dnf -y install rust cargo gcc binutils tar ca-certificates
+      - name: Build
+        run: cargo build --release --locked
+      - name: Verify glibc floor and NEEDED set
+        run: |
+          max=$(objdump -T target/release/linelight | grep -o 'GLIBC_[0-9.]*' | sed 's/^GLIBC_//' | sort -V | tail -1)
+          test -n "$max"
+          test "$(printf '%s\n' "$max" 2.28 | sort -V | tail -1)" = "2.28"
+          allowed='libc.so.6 libm.so.6 libpthread.so.0 libdl.so.2 libgcc_s.so.1 ld-linux-x86-64.so.2'
+          for needed in $(objdump -p target/release/linelight | awk '/NEEDED/{print $2}'); do
+            case " $allowed " in
+              *" $needed "*) ;;
+              *) echo "unexpected NEEDED: $needed"; exit 1 ;;
+            esac
+          done
+      - name: Smoke on AlmaLinux 8
+        run: |
+          target/release/linelight --version
+          target/release/linelight check
+          printf 'Filesystem Size Used Avail Use%% Mounted on\n/dev/sda1 100G 1G 99G 1%% /\n' \
+            | target/release/linelight filter --profile df --color always \
+            | grep -q $'\033'
+          target/release/linelight run --profile df -- df -h | grep -q Filesystem

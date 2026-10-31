@@ -205,9 +205,11 @@ Fish copies it with `--wraps`.
 
 ## Installation
 
-Single binary with embedded profiles. Default prefix `$HOME/.local`; no sudo,
-`/etc`, package manager, service, setuid bit, capability, writable install
-directory, cache, or network. Custom XDG roots and arbitrary prefixes
+Single binary with embedded profiles. The released Linux x86_64 build is linked
+against glibc 2.28 (the EL8 floor), verified by symbol version and NEEDED set,
+and smoke-tested on AlmaLinux 8. Default prefix `$HOME/.local`; no sudo, `/etc`,
+package manager, service, setuid bit, capability, writable install directory,
+cache, or network. Custom XDG roots and arbitrary prefixes
 (including spaces) work. A read-only shared tree needs no writes beside the
 executable.
 
@@ -233,6 +235,8 @@ executable.
   behaviour;
 - adapter generation, disable config, collision handling, shell syntax, and
   seeded completion survival in bash, zsh, tcsh, and fish;
+- release binary GLIBC symbol floor ≤ 2.28, allowed NEEDED set, and AlmaLinux 8
+  smoke test;
 - unprivileged install into a prefix with spaces, clean HOME/XDG, and a
   read-only executable.
 

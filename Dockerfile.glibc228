@@ -1,0 +1,3 @@
+FROM almalinux:8
+RUN dnf -y install rust cargo gcc binutils ca-certificates \
+    && dnf clean all

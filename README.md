@@ -14,7 +14,7 @@ A command-line filter and runner that make plain logs and command output easier 
 
 Pipe in text and choose a profile. Linelight highlights useful details while
 preserving the original text. All 11 built-in profiles travel with the binary,
-which runs on its own on a compatible remote host.
+which runs on its own on a supported remote host.
 
 ## Get started
 
@@ -41,7 +41,11 @@ printf '%s\n' \
     ~/.local/bin/linelight filter --profile log
 ```
 
-Rust is needed only for building; the installed binary runs offline.
+Rust is needed only for building; the installed binary runs offline. Published
+Linux x86_64 release binaries are linked against glibc 2.28 (the EL8 floor) and
+are smoke-tested on AlmaLinux 8. Build that artifact locally with
+`./scripts/build-glibc228.sh`; the release workflow verifies the symbol floor
+and NEEDED set on every tag.
 
 <details>
 <summary>Use a different install location</summary>
@@ -281,6 +285,7 @@ cargo test
 cargo build --release
 ./tests/deploy.sh
 ./tests/completion.sh
+./scripts/build-glibc228.sh
 target/release/linelight check
 ```
 

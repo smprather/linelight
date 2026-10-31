@@ -1,12 +1,14 @@
 use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io::{self, BufReader, Read};
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, OwnedFd, RawFd};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::process::{Command, Stdio};
 use std::thread::{self, JoinHandle};
 
-use nix::pty::openpty;
+use nix::fcntl::{open, OFlag};
+use nix::pty::{grantpt, posix_openpt, ptsname_r, unlockpt};
+use nix::sys::stat::Mode;
 use nix::sys::termios::{tcgetattr, tcsetattr, OutputFlags, SetArg};
 use signal_hook::consts::{SIGHUP, SIGQUIT, SIGTERM, SIGWINCH};
 use signal_hook::iterator::Signals;
@@ -155,9 +157,21 @@ pub fn run(options: RunOptions) -> Result<i32> {
 }
 
 fn open_pty_stdout(cmd: &mut Command) -> Result<File> {
-    let pair = openpty(None, None).map_err(|error| Error::new(format!("openpty: {}", error)))?;
-    let master: File = pair.master.into();
-    let slave: File = pair.slave.into();
+    let master = posix_openpt(OFlag::O_RDWR | OFlag::O_NOCTTY)
+        .map_err(|error| Error::new(format!("posix_openpt: {}", error)))?;
+    grantpt(&master).map_err(|error| Error::new(format!("grantpt: {}", error)))?;
+    unlockpt(&master).map_err(|error| Error::new(format!("unlockpt: {}", error)))?;
+    let slave_name =
+        ptsname_r(&master).map_err(|error| Error::new(format!("ptsname_r: {}", error)))?;
+    let slave_fd = open(
+        std::path::Path::new(&slave_name),
+        OFlag::O_RDWR | OFlag::O_NOCTTY,
+        Mode::empty(),
+    )
+    .map_err(|error| Error::new(format!("open {}: {}", slave_name, error)))?;
+    let slave: File = slave_fd.into();
+    let master_fd: OwnedFd = master.into();
+    let master: File = master_fd.into();
 
     let mut termios =
         tcgetattr(&slave).map_err(|error| Error::new(format!("tcgetattr: {}", error)))?;
