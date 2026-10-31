@@ -68,8 +68,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="$GITHUB_REF_NAME"
+          repo="$GITHUB_REPOSITORY"
           version="${tag#v}"
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" --title "linelight $version" --notes "Release $version"
+          if ! gh release view "$tag" -R "$repo" >/dev/null 2>&1; then
+            gh release create "$tag" -R "$repo" --title "linelight $version" --notes "Release $version"
           fi
-          gh release upload "$tag" dist/*.tar.gz dist/*.sha256 --clobber
+          gh release upload "$tag" -R "$repo" dist/*.tar.gz dist/*.sha256 --clobber
