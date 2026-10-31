@@ -55,6 +55,17 @@ HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/xdg" PATH="$tmp/bin:$PATH" \
         complete ps | grep -q MARKER_PING || exit 1
     '
 
+# README documents `eval "`linelight init tcsh`"` in ~/.tcshrc. Exercise that
+# exact form: tcsh joins the substitution into one line before eval parses it.
+HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/xdg" PATH="$tmp/bin:$PATH" \
+    LL_BIN="$tmp/bin" tcsh -f -c '
+        set path = ($LL_BIN $path)
+        complete df "p/1/(MARKER_DF)/"
+        complete ps "p/1/(MARKER_PING)/"
+        eval "`linelight init tcsh`"
+        alias df | grep -q -- "--profile df" && alias ps | grep -q -- "--profile ps" && complete df | grep -q MARKER_DF && complete ps | grep -q MARKER_PING
+    '
+
 "$BIN" init fish > "$tmp/init.fish"
 HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/xdg" PATH="$tmp/bin:$PATH" \
     LL_BIN="$tmp/bin" LL_INIT="$tmp/init.fish" fish --no-config -c '
