@@ -271,3 +271,21 @@ name-based completion; Fish copies completion with `--wraps`.
 
 Run `linelight --help` for options, or `man linelight` after installation.
 See the [manual source](linelight.1) and [design notes](DESIGN.md) for more detail.
+
+## Development
+
+```sh
+cargo fmt -- --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo build --release
+./tests/deploy.sh
+./tests/completion.sh
+target/release/linelight check
+```
+
+`tests/deploy.sh` installs into a prefix containing spaces with a clean
+HOME/XDG environment and a read-only executable. `tests/completion.sh` seeds
+completion for wrapped names, sources the generated bash/zsh/tcsh/fish
+adapters, and confirms both the wrapper and its completion registration
+survive.
