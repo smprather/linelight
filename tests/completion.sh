@@ -33,7 +33,7 @@ HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/xdg" PATH="$tmp/bin:$PATH" \
 HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/xdg" PATH="$tmp/bin:$PATH" \
     LL_INIT="$tmp/init.zsh" zsh -f -c '
         autoload -Uz compinit
-        compinit -D
+        compinit -C
         _ll_complete() { _arguments; }
         compdef _ll_complete df
         compdef _ll_complete ps
